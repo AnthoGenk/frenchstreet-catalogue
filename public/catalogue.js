@@ -59,7 +59,7 @@ function render() {
   $("#count").textContent = list.length + (list.length > 1 ? " pièces" : " pièce");
   $("#grid").innerHTML = list.map((p) => `
     <button class="card" data-id="${esc(p.id)}" aria-label="${esc(p.brand + " " + p.name)}">
-      <div class="card-img">${p.images[0] ? `<img src="${esc(p.images[0])}" alt="" loading="lazy" decoding="async">` : `<span class="noimg">PHOTO À VENIR</span>`}</div>
+      <div class="card-img">${p.images[0] ? `<img src="${esc(p.images[0])}" alt="" loading="lazy" decoding="async">` : `<span class="noimg">PHOTO À VENIR</span>`}${p.images.length > 1 ? `<span class="count-badge">${p.images.length} photos</span>` : ""}</div>
       ${p.brand ? `<div class="card-brand">${esc(p.brand)}</div>` : ""}
       <div class="card-name">${esc(p.name)}</div>
     </button>`).join("");
@@ -76,8 +76,9 @@ function openProduct(id) {
   const meta = [["Marque", p.brand], ["Modèle", p.model], ["Référence", p.reference], ["Catégorie", p.category]].filter(([, v]) => v);
   const ref = p.reference || p.model || p.id;
   $("#detail").innerHTML = `
-    ${p.images.length ? `<div class="gallery" id="gal">${p.images.map((src, i) => `<img src="${esc(src)}" alt="${esc(p.name)} — photo ${i + 1}" ${i ? 'loading="lazy"' : ""}>`).join("")}</div>
-    ${p.images.length > 1 ? `<div class="dots" id="dots">${p.images.map((_, i) => `<i class="${i ? "" : "on"}"></i>`).join("")}</div>` : ""}` : ""}
+    ${p.images.length ? `<div class="gal-wrap"><div class="gallery" id="gal">${p.images.map((src, i) => `<img src="${esc(src)}" alt="${esc(p.name)} — photo ${i + 1}" ${i ? 'loading="lazy"' : ""}>`).join("")}</div>
+      ${p.images.length > 1 ? `<button class="nav prev" data-step="-1" aria-label="Photo précédente">‹</button><button class="nav next" data-step="1" aria-label="Photo suivante">›</button><span class="counter" id="counter">1 / ${p.images.length}</span>` : ""}</div>
+    ${p.images.length > 1 ? `<div class="thumbs" id="thumbs">${p.images.map((src, i) => `<button class="${i ? "" : "on"}" data-go="${i}" aria-label="Photo ${i + 1}"><img src="${esc(src)}" alt="" loading="lazy"></button>`).join("")}</div>` : ""}` : ""}
     <div class="d-body">
       <div>${p.brand ? `<div class="d-brand">${esc(p.brand)}</div>` : ""}<h2 class="d-name">${esc(p.name)}</h2></div>
       <dl class="d-meta">${meta.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}</dl>
@@ -85,11 +86,22 @@ function openProduct(id) {
       ${p.specs.length ? `<p class="section-label">Caractéristiques</p><dl class="d-meta">${p.specs.map((s) => `<dt>${esc(s.label)}</dt><dd>${esc(s.value)}</dd>`).join("")}</dl>` : ""}
       <button class="cta" id="copyref"><strong>Je veux cette pièce →</strong><span>Copie la référence et envoie-la en DM à ${HANDLE}</span></button>
     </div>`;
-  const gal = $("#gal"), dots = $("#dots");
-  if (gal && dots) gal.addEventListener("scroll", () => {
-    const i = Math.round(gal.scrollLeft / gal.clientWidth);
-    [...dots.children].forEach((d, j) => d.classList.toggle("on", i === j));
-  }, { passive: true });
+  const gal = $("#gal"), thumbs = $("#thumbs");
+  if (gal && thumbs) {
+    const n = p.images.length;
+    const current = () => Math.round(gal.scrollLeft / gal.clientWidth);
+    const go = (i) => gal.scrollTo({ left: ((i + n) % n) * gal.clientWidth, behavior: "smooth" });
+    gal.addEventListener("scroll", () => {
+      const i = current();
+      $("#counter").textContent = `${i + 1} / ${n}`;
+      [...thumbs.children].forEach((t, j) => t.classList.toggle("on", i === j));
+    }, { passive: true });
+    $("#detail").onclick = (e) => {
+      const b = e.target.closest("[data-step],[data-go]"); if (!b) return;
+      go(b.dataset.go != null ? +b.dataset.go : current() + +b.dataset.step);
+    };
+    $("#sheet").onkeydown = (e) => { if (e.key === "ArrowRight") go(current() + 1); if (e.key === "ArrowLeft") go(current() - 1); };
+  }
   $("#copyref").onclick = () => copy(`French Street — ${[p.brand, p.name].filter(Boolean).join(" ")} (réf. ${ref}) ${location.origin}/#p=${p.id}`);
   const sheet = $("#sheet");
   if (!sheet.open) sheet.showModal();
