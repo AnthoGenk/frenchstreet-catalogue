@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0E0E0F">
+<title>French Street — Catalogue</title>
+<meta name="description" content="Le catalogue French Street. Tu montres, on trouve.">
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100,400;100,500;100,700;125,800;125,900&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="#" aria-label="French Street — accueil">
+    <img src="logo.svg" alt="" width="30" height="36">
+    <span>FRENCH<b>STREET</b></span>
+  </a>
+  <a class="dm" href="#contact">DM</a>
+</header>
+
+<main>
+  <section class="hero">
+    <h1>TU MONTRES.<br><em>ON TROUVE.</em></h1>
+    <p>Parcours le catalogue, repère ta pièce, envoie-nous la référence en DM.</p>
+  </section>
+
+  <div class="controls">
+    <label class="search">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 20l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <input id="q" type="search" placeholder="Nom, marque, modèle, référence…" autocomplete="off" aria-label="Rechercher">
+    </label>
+    <div class="chips" id="cats" role="tablist" aria-label="Catégories"></div>
+    <select id="brand" aria-label="Filtrer par marque" hidden></select>
+  </div>
+
+  <p class="count" id="count" aria-live="polite"></p>
+  <div class="grid" id="grid"></div>
+  <p class="empty" id="empty" hidden></p>
+</main>
+
+<footer id="contact" class="foot">
+  <img src="logo.svg" alt="" width="40" height="48">
+  <p class="foot-title">UNE PIÈCE T'INTÉRESSE ?</p>
+  <p>Envoie la référence en DM à <b>@french-street</b>.<br>Tu ne la trouves pas ici ? Envoie une capture, on la source pour toi.</p>
+</footer>
+
+<dialog id="sheet" aria-label="Fiche produit">
+  <button class="close" id="close" aria-label="Fermer">✕</button>
+  <div id="detail"></div>
+</dialog>
+
+<script src="catalogue.js"></script>
+</body>
+</html>

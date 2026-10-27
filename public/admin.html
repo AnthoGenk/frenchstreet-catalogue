@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0E0E0F">
+<meta name="robots" content="noindex, nofollow">
+<title>French Street — Admin</title>
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100,400;100,500;100,700;125,800;125,900&display=swap">
+<link rel="stylesheet" href="style.css">
+<style>
+  main { max-width: 760px; padding-bottom: 80px; }
+  .panel { display: grid; gap: 14px; margin-top: 20px; }
+  h1.adm { font-size: 30px; margin: 28px 0 0; }
+  label.f { display: grid; gap: 6px; font-size: 13px; font-weight: 700; letter-spacing: .04em; color: var(--muted); }
+  .in, textarea { width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; font-size: 16px; color: var(--ink); }
+  .in:focus, textarea:focus, select:focus { outline: 0; border-color: var(--accent); }
+  textarea { min-height: 120px; resize: vertical; }
+  .btn { border: 0; border-radius: 12px; padding: 14px 18px; font-weight: 800; font-size: 15px; cursor: pointer; background: var(--accent); color: #0E0E0F; }
+  .btn.ghost { background: none; color: var(--ink); border: 1px solid var(--line); }
+  .btn.small { padding: 8px 12px; font-size: 13px; }
+  .btn.danger { background: none; color: var(--danger); border: 1px solid #5a2a2a; }
+  .btn:disabled { opacity: .5; cursor: wait; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .row > .in { flex: 1; min-width: 200px; }
+  .tabs { display: flex; gap: 8px; margin-top: 20px; }
+  .msg { border-radius: 12px; padding: 12px 14px; font-size: 14px; }
+  .msg.err { background: #2a1416; color: #FFB4B4; border: 1px solid #5a2a2a; }
+  .msg.ok { background: #121b33; color: #C9D8FF; border: 1px solid #2b3d70; }
+  .src { font-weight: 600; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; margin-left: 6px; }
+  .src.found { color: var(--accent); }
+  .src.miss { color: #8b877f; }
+  .imgs { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; }
+  .tile { position: relative; aspect-ratio: 1; border-radius: 10px; overflow: hidden; background: #F4F1EA; border: 3px solid transparent; cursor: pointer; padding: 0; }
+  .tile img { width: 100%; height: 100%; object-fit: contain; }
+  .tile.on { border-color: var(--accent); }
+  .tile .badge { position: absolute; top: 4px; left: 4px; background: var(--accent); color: #0E0E0F; font-weight: 900; font-size: 12px; border-radius: 6px; padding: 1px 6px; }
+  .tile .broken { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: #2a1416; color: #FFB4B4; font-size: 11px; text-align: center; padding: 6px; }
+  .spec { display: grid; grid-template-columns: 1fr 1.6fr auto; gap: 8px; }
+  .list-item { display: grid; grid-template-columns: 64px 1fr auto; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .list-item img, .list-item .ph { width: 64px; height: 64px; object-fit: contain; background: #F4F1EA; border-radius: 8px; }
+  .list-item .t { font-weight: 800; line-height: 1.2; }
+  .list-item .s { color: var(--muted); font-size: 13px; }
+  .hint { color: var(--muted); font-size: 13px; margin: 0; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="/" aria-label="Voir le catalogue public"><img src="logo.svg" alt="" width="30" height="36"><span>FRENCH<b>STREET</b></span></a>
+  <button class="btn small ghost" id="logout" hidden>Déconnexion</button>
+</header>
+
+<main>
+  <!-- Connexion -->
+  <section id="login" class="panel">
+    <h1 class="adm display">Administration</h1>
+    <form id="loginForm" class="panel">
+      <label class="f">Mot de passe<input class="in" id="pwd" type="password" autocomplete="current-password" required></label>
+      <button class="btn" type="submit">Se connecter</button>
+      <div id="loginMsg"></div>
+    </form>
+  </section>
+
+  <section id="app" hidden>
+    <div class="tabs">
+      <button class="chip" id="tabAdd" aria-selected="true">Ajouter</button>
+      <button class="chip" id="tabList" aria-selected="false">Mes produits</button>
+    </div>
+
+    <!-- Ajout -->
+    <div id="addView" class="panel">
+      <form id="importForm" class="panel">
+        <label class="f">URL de la page produit
+          <div class="row">
+            <input class="in" id="url" type="url" inputmode="url" placeholder="https://…" required>
+            <button class="btn" id="importBtn" type="submit">Importer le produit</button>
+          </div>
+        </label>
+        <p class="hint">Ou <a href="#" id="manual">saisir un produit à la main</a> (si le site bloque l'import).</p>
+      </form>
+      <div id="importMsg"></div>
+    </div>
+
+    <!-- Liste -->
+    <div id="listView" class="panel" hidden>
+      <input class="in" id="listQ" type="search" placeholder="Rechercher dans mes produits…">
+      <div id="list"></div>
+    </div>
+
+    <!-- Éditeur (aperçu d'import, saisie manuelle, modification) -->
+    <form id="editor" class="panel" hidden novalidate>
+      <h2 class="display" id="edTitle" style="margin:12px 0 0;font-size:22px">Vérifier le produit</h2>
+      <label class="f"><span>Nom du produit * <span class="src" data-src="name"></span></span><input class="in" name="name" required></label>
+      <label class="f"><span>Marque <span class="src" data-src="brand"></span></span><input class="in" name="brand"></label>
+      <div class="row">
+        <label class="f" style="flex:1"><span>Modèle <span class="src" data-src="model"></span></span><input class="in" name="model"></label>
+        <label class="f" style="flex:1"><span>Référence <span class="src" data-src="reference"></span></span><input class="in" name="reference"></label>
+      </div>
+      <label class="f">Catégorie *
+        <select name="category" id="catSel"></select>
+      </label>
+      <input class="in" id="newCat" placeholder="Nom de la nouvelle catégorie" hidden>
+      <label class="f"><span>Description <span class="src" data-src="description"></span></span><textarea name="description"></textarea></label>
+
+      <p class="section-label">Photos <span id="imgCount" style="color:var(--accent)"></span></p>
+      <p class="hint">Touche une photo pour la garder ou l'enlever. Le n°1 sera la photo principale. Les photos gardées sont copiées sur ton hébergement à la publication.</p>
+      <div class="imgs" id="imgs"></div>
+      <div class="row">
+        <input class="in" id="imgUrl" type="url" placeholder="Ajouter une photo par son URL">
+        <button class="btn small ghost" type="button" id="addImgUrl">Ajouter</button>
+        <label class="btn small ghost" style="cursor:pointer">Depuis mon téléphone<input type="file" id="upload" accept="image/*" multiple hidden></label>
+      </div>
+
+      <p class="section-label">Caractéristiques</p>
+      <div id="specs" class="panel" style="margin:0"></div>
+      <button class="btn small ghost" type="button" id="addSpec" style="justify-self:start">+ Ajouter une caractéristique</button>
+
+      <div id="saveMsg"></div>
+      <div class="row">
+        <button class="btn" type="submit" id="saveBtn" style="flex:1">Publier dans le catalogue</button>
+        <button class="btn ghost" type="button" id="cancel">Annuler</button>
+      </div>
+    </form>
+  </section>
+</main>
+<script src="admin.js"></script>
+</body>
+</html>
