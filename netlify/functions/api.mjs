@@ -4,6 +4,7 @@
 import crypto from "node:crypto";
 import { store } from "../../lib/store.mjs";
 import { importProduct, assertPublicUrl, fetchWithTimeout, ImportError } from "../../lib/extract.mjs";
+import { listAlbums, getPhotoData, mapCategory } from "../../lib/gzsport.mjs";
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif"];
@@ -32,6 +33,17 @@ export default async (req) => {
       }
       if (req.method === "POST" && route[0] === "products") return saveProduct(await req.json().catch(() => null));
       if (req.method === "DELETE" && route[0] === "products" && route[1]) return deleteProduct(route[1]);
+      // Import du catalogue GZ SPORT : liste des albums, puis copie photo par photo
+      if (req.method === "GET" && route[0] === "gz" && route[1] === "albums") {
+        const { albums } = await listAlbums();
+        const imported = new Set((await readCatalog()).map((p) => p.sourceUrl));
+        return json(albums.map((a) => ({ ...a, suggestedCategory: mapCategory(a), imported: imported.has("gzsport:" + a.id) })));
+      }
+      if (req.method === "POST" && route[0] === "gz" && route[1] === "photo") {
+        const { albumId, photoId } = await req.json().catch(() => ({}));
+        const data = await getPhotoData(String(photoId || ""));
+        return json({ src: await storeImage("gz" + String(albumId || "").replace(/\W/g, "").slice(0, 12), data) });
+      }
     }
     return json({ error: "Route inconnue." }, 404);
   } catch (e) {

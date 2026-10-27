@@ -44,12 +44,15 @@ async function start() {
 function showTab(tab) {
   $("#tabAdd").setAttribute("aria-selected", tab === "add");
   $("#tabList").setAttribute("aria-selected", tab === "list");
+  $("#tabGz").setAttribute("aria-selected", tab === "gz");
   $("#addView").hidden = tab !== "add";
   $("#listView").hidden = tab !== "list";
+  $("#gzView").hidden = tab !== "gz";
   $("#editor").hidden = true;
 }
 $("#tabAdd").onclick = () => showTab("add");
 $("#tabList").onclick = () => showTab("list");
+$("#tabGz").onclick = () => showTab("gz");
 
 // ---------- Import ----------
 const FALLBACK = {
@@ -218,6 +221,67 @@ $("#list").onclick = async (e) => {
     try { await api("products/" + encodeURIComponent(p.id), { method: "DELETE" }); await refreshList(); }
     catch (err) { alert(err.message); }
   }
+};
+
+// ---------- Import en masse GZ SPORT ----------
+let gzAlbums = [], gzSelected = new Set(), gzStop = false;
+$("#gzLoad").onclick = async () => {
+  const b = $("#gzLoad"); b.disabled = true; b.textContent = "Chargement…"; msg("#gzMsg", "");
+  try {
+    gzAlbums = await api("gz/albums");
+    gzSelected = new Set(gzAlbums.filter((a) => !a.imported && !a.soldOut).map((a) => a.id));
+    const done = gzAlbums.filter((a) => a.imported).length;
+    msg("#gzMsg", `${gzAlbums.length} produits trouvés, dont ${done} déjà importé${done > 1 ? "s" : ""}. Les produits non importés et disponibles sont présélectionnés.`, "ok");
+    $("#gzTools").hidden = false; renderGz();
+  } catch (err) { msg("#gzMsg", esc(err.message)); }
+  finally { b.disabled = false; b.textContent = "Recharger le catalogue GZ SPORT"; }
+};
+function gzVisible() {
+  const words = norm($("#gzQ").value).split(/\s+/).filter(Boolean);
+  return gzAlbums.filter((a) => words.every((w) => norm([a.title, a.brand, a.model, a.category].join(" ")).includes(w)));
+}
+function renderGz() {
+  $("#gzList").innerHTML = gzVisible().map((a) => `
+    <label class="gz-item">
+      <input type="checkbox" data-gz="${esc(a.id)}" ${gzSelected.has(a.id) ? "checked" : ""}>
+      <span><b>${esc(a.title || "Sans titre")}</b>${a.imported ? '<span class="tag ok">DÉJÀ IMPORTÉ</span>' : ""}${a.soldOut ? '<span class="tag">SOLD OUT</span>' : ""}<br>
+      <span class="hint">${esc([a.brand, a.model, a.category, a.photoIds.length + " photos", "→ " + a.suggestedCategory].filter(Boolean).join(" · "))}</span></span>
+    </label>`).join("") || `<p class="hint">Aucun produit.</p>`;
+  $("#gzRun").textContent = `Importer la sélection (${gzSelected.size})`;
+}
+$("#gzQ").oninput = renderGz;
+$("#gzList").onchange = (e) => { const id = e.target.dataset.gz; if (!id) return; e.target.checked ? gzSelected.add(id) : gzSelected.delete(id); renderGz(); };
+$("#gzAll").onclick = () => { gzVisible().forEach((a) => gzSelected.add(a.id)); renderGz(); };
+$("#gzNone").onclick = () => { gzVisible().forEach((a) => gzSelected.delete(a.id)); renderGz(); };
+$("#gzStop").onclick = () => { gzStop = true; };
+$("#gzRun").onclick = async () => {
+  const todo = gzAlbums.filter((a) => gzSelected.has(a.id));
+  if (!todo.length) return msg("#gzMsg", "Sélectionne au moins un produit.");
+  gzStop = false; $("#gzRun").disabled = true; $("#gzStop").hidden = false;
+  let ok = 0; const failed = [];
+  for (const [n, a] of todo.entries()) {
+    if (gzStop) break;
+    const label = `Produit ${n + 1}/${todo.length} : ${esc(a.title || a.id)}`;
+    try {
+      const images = [];
+      for (const [i, pid] of a.photoIds.slice(0, 20).entries()) {
+        msg("#gzMsg", `${label} — photo ${i + 1}/${Math.min(a.photoIds.length, 20)}`, "ok");
+        try { images.push((await api("gz/photo", { method: "POST", body: JSON.stringify({ albumId: a.id, photoId: pid }) })).src); }
+        catch { /* photo manquante : on continue */ }
+      }
+      const existing = products.find((p) => p.sourceUrl === "gzsport:" + a.id);
+      await api("products", { method: "POST", body: JSON.stringify({
+        id: existing?.id, name: a.title || a.model || "Sans titre", brand: a.brand, model: a.model,
+        description: a.description, category: existing?.category || a.suggestedCategory,
+        images, specs: existing?.specs || [], sourceUrl: "gzsport:" + a.id,
+      }) });
+      a.imported = true; gzSelected.delete(a.id); ok++;
+    } catch (err) { failed.push(`${a.title || a.id} : ${err.message}`); }
+  }
+  await refreshList();
+  $("#gzRun").disabled = false; $("#gzStop").hidden = true; renderGz();
+  msg("#gzMsg", `${ok} produit${ok > 1 ? "s" : ""} importé${ok > 1 ? "s" : ""}${gzStop ? " (arrêté)" : ""}.` +
+    (failed.length ? `<br>${failed.length} échec(s) : ${failed.slice(0, 5).map(esc).join("<br>")}` : ""), failed.length ? "err" : "ok");
 };
 
 if (password) start().catch(() => logout());
