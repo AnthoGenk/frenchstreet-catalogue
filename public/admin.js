@@ -244,7 +244,7 @@ function renderGz() {
   $("#gzList").innerHTML = gzVisible().map((a) => `
     <label class="gz-item">
       <input type="checkbox" data-gz="${esc(a.id)}" ${gzSelected.has(a.id) ? "checked" : ""}>
-      <span><b>${esc(a.title || "Sans titre")}</b>${a.imported ? '<span class="tag ok">DÉJÀ IMPORTÉ</span>' : ""}${a.soldOut ? '<span class="tag">SOLD OUT</span>' : ""}<br>
+      <span><b>${esc(a.frName || a.title || "Sans titre")}</b>${a.imported ? '<span class="tag ok">DÉJÀ IMPORTÉ</span>' : ""}${a.soldOut ? '<span class="tag">SOLD OUT</span>' : ""}<br>
       <span class="hint">${esc([a.brand, a.model, a.category, a.photoIds.length + " photos", "→ " + a.suggestedCategory].filter(Boolean).join(" · "))}</span></span>
     </label>`).join("") || `<p class="hint">Aucun produit.</p>`;
   $("#gzRun").textContent = `Importer la sélection (${gzSelected.size})`;
@@ -258,7 +258,7 @@ $("#gzRun").onclick = async () => {
   const todo = gzAlbums.filter((a) => gzSelected.has(a.id));
   if (!todo.length) return msg("#gzMsg", "Sélectionne au moins un produit.");
   gzStop = false; $("#gzRun").disabled = true; $("#gzStop").hidden = false;
-  let ok = 0; const failed = [];
+  let ok = 0; const failed = [], photoErrors = [];
   for (const [n, a] of todo.entries()) {
     if (gzStop) break;
     const label = `Produit ${n + 1}/${todo.length} : ${esc(a.title || a.id)}`;
@@ -266,14 +266,18 @@ $("#gzRun").onclick = async () => {
       const images = [];
       for (const [i, pid] of a.photoIds.slice(0, 20).entries()) {
         msg("#gzMsg", `${label} — photo ${i + 1}/${Math.min(a.photoIds.length, 20)}`, "ok");
-        try { images.push((await api("gz/photo", { method: "POST", body: JSON.stringify({ albumId: a.id, photoId: pid }) })).src); }
-        catch { /* photo manquante : on continue */ }
+        const body = JSON.stringify({ albumId: a.id, photoId: pid });
+        try { images.push((await api("gz/photo", { method: "POST", body })).src); }
+        catch (e1) {
+          try { images.push((await api("gz/photo", { method: "POST", body })).src); } // 2e essai
+          catch (e2) { photoErrors.push(e2.message); }
+        }
       }
       const existing = products.find((p) => p.sourceUrl === "gzsport:" + a.id);
       await api("products", { method: "POST", body: JSON.stringify({
-        id: existing?.id, name: a.title || a.model || "Sans titre", brand: a.brand, model: a.model,
+        id: existing?.id, name: a.frName || a.title || "Sans titre", brand: a.brand, model: a.model,
         description: a.description, category: existing?.category || a.suggestedCategory,
-        images, specs: existing?.specs || [], sourceUrl: "gzsport:" + a.id,
+        images, specs: a.sizes ? [{ label: "Tailles", value: a.sizes }] : [], reference: a.title, sourceUrl: "gzsport:" + a.id,
       }) });
       a.imported = true; gzSelected.delete(a.id); ok++;
     } catch (err) { failed.push(`${a.title || a.id} : ${err.message}`); }
@@ -281,7 +285,9 @@ $("#gzRun").onclick = async () => {
   await refreshList();
   $("#gzRun").disabled = false; $("#gzStop").hidden = true; renderGz();
   msg("#gzMsg", `${ok} produit${ok > 1 ? "s" : ""} importé${ok > 1 ? "s" : ""}${gzStop ? " (arrêté)" : ""}.` +
-    (failed.length ? `<br>${failed.length} échec(s) : ${failed.slice(0, 5).map(esc).join("<br>")}` : ""), failed.length ? "err" : "ok");
+    (failed.length ? `<br>${failed.length} échec(s) : ${failed.slice(0, 5).map(esc).join("<br>")}` : "") +
+    (photoErrors.length ? `<br>${photoErrors.length} photo(s) non récupérée(s). Raison : ${esc([...new Set(photoErrors)].slice(0, 3).join(" | "))}` : ""),
+    failed.length || photoErrors.length ? "err" : "ok");
 };
 
 if (password) start().catch(() => logout());

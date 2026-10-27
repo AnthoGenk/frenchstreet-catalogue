@@ -4,10 +4,9 @@
 import crypto from "node:crypto";
 import { store } from "../../lib/store.mjs";
 import { importProduct, assertPublicUrl, fetchWithTimeout, ImportError } from "../../lib/extract.mjs";
-import { listAlbums, getPhotoData, mapCategory } from "../../lib/gzsport.mjs";
+import { listAlbums, getPhotoData, mapCategory, frenchName } from "../../lib/gzsport.mjs";
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
-const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif"];
 
 export default async (req) => {
   try {
@@ -37,7 +36,7 @@ export default async (req) => {
       if (req.method === "GET" && route[0] === "gz" && route[1] === "albums") {
         const { albums } = await listAlbums();
         const imported = new Set((await readCatalog()).map((p) => p.sourceUrl));
-        return json(albums.map((a) => ({ ...a, suggestedCategory: mapCategory(a), imported: imported.has("gzsport:" + a.id) })));
+        return json(albums.map((a) => ({ ...a, ...pick(frenchName(a)), suggestedCategory: mapCategory(a), imported: imported.has("gzsport:" + a.id) })));
       }
       if (req.method === "POST" && route[0] === "gz" && route[1] === "photo") {
         const { albumId, photoId } = await req.json().catch(() => ({}));
@@ -127,9 +126,9 @@ async function storeImage(productId, src) {
   if (src.startsWith("/api/img/")) return src; // déjà hébergée
   let bytes, contentType;
   if (src.startsWith("data:")) {
-    const m = src.match(/^data:([\w/+.-]+);base64,(.+)$/);
+    const m = src.replace(/\s/g, "").match(/^data:([\w/+.-]+)(?:;[^,;]*)*;base64,(.+)$/);
     if (!m) throw new Error("Fichier image illisible.");
-    contentType = m[1];
+    contentType = m[1].toLowerCase();
     bytes = Buffer.from(m[2], "base64");
   } else {
     const u = assertPublicUrl(src);
@@ -138,7 +137,8 @@ async function storeImage(productId, src) {
     contentType = (res.headers.get("content-type") || "").split(";")[0].trim();
     bytes = Buffer.from(await res.arrayBuffer());
   }
-  if (!IMAGE_TYPES.includes(contentType)) throw new Error("Format non accepté (" + (contentType || "inconnu") + ").");
+  if (contentType === "image/jpg" || contentType === "image/pjpeg") contentType = "image/jpeg";
+  if (!contentType.startsWith("image/") || contentType.includes("svg")) throw new Error("Format non accepté (" + (contentType || "inconnu") + ").");
   if (bytes.length > MAX_IMAGE_BYTES) throw new Error("Image trop lourde (max 10 Mo).");
   if (bytes.length < 1000) throw new Error("Image vide ou trop petite.");
   const key = `${productId}-${crypto.randomUUID().slice(0, 8)}`;
@@ -157,3 +157,5 @@ async function serveImage(key) {
 function json(data, status = 200, headers = {}) {
   return new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json; charset=utf-8", ...headers } });
 }
+
+const pick = ({ name, sizes }) => ({ frName: name, sizes });
